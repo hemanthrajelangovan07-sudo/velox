@@ -24,7 +24,6 @@ VEHICLES = [
     {"id": "VH-005", "type": "Hybrid",  "name": "Honda City Hybrid"},
 ]
 
-# Base state per vehicle (persists between ticks)
 state = {
     v["id"]: {
         "speed":       random.uniform(30, 80),
@@ -46,7 +45,6 @@ def next_reading(vehicle):
     s = state[vid]
     s["tick"] += 1
 
-    # Natural drift
     s["speed"]       = max(0,   min(160, s["speed"]       + random.uniform(-5, 5)))
     s["temperature"] = max(60,  min(105, s["temperature"] + random.uniform(-1, 1.5)))
     s["engine_rpm"]  = max(800, min(7000, s["speed"] * 38 + random.uniform(-200, 200)))
@@ -61,7 +59,6 @@ def next_reading(vehicle):
         s["fuel_level"]  = max(0, s["fuel_level"] - random.uniform(0.01, 0.05))
         s["battery_pct"] = None
 
-    # Occasional anomaly injection for drama in the demo
     s["anomaly_countdown"] -= 1
     if s["anomaly_countdown"] <= 0:
         anomaly = random.choice(["overheat", "overspeed", "low_battery"])
