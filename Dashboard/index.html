@@ -71,7 +71,6 @@
     text-transform: uppercase; letter-spacing: 2px; color: var(--muted); margin-bottom: 14px;
   }
 
-  /* ── Vehicle Cards ── */
   .vehicle-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; margin-bottom: 28px; }
   .vehicle-card {
     background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
@@ -99,7 +98,6 @@
   .risk-HIGH   { background: rgba(255,59,92,0.15); color: var(--red); }
   .risk-UNKNOWN{ background: rgba(74,90,110,0.2);  color: var(--muted); }
 
-  /* ── Detail Panel ── */
   .detail-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 28px; }
   @media(max-width:800px){ .detail-panel { grid-template-columns: 1fr; } }
   .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
@@ -107,7 +105,6 @@
   .panel-title { font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 700; color: var(--heading); text-transform: uppercase; letter-spacing: 1.5px; }
   .chart-wrap { position: relative; height: 100px; }
 
-  /* ── Live Feed ── */
   .feed { max-height: 300px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
   .feed-row {
     display: grid;
@@ -122,7 +119,6 @@
   .feed-time { color: var(--muted); }
   .unit { color: var(--muted); font-size: 9px; margin-left: 1px; }
 
-  /* ── Report Panel ── */
   .report-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
   .range-btn {
     padding: 5px 12px; background: transparent; border: 1px solid var(--border);
@@ -138,7 +134,6 @@
   .stat-val { color: var(--heading); font-size: 15px; font-family: 'Syne', sans-serif; font-weight: 700; }
   .stat-sub { color: var(--muted); font-size: 10px; margin-top: 2px; }
 
-  /* ── Alerts ── */
   .alert-item { background: rgba(255,59,92,0.06); border: 1px solid rgba(255,59,92,0.2); border-radius: 6px; padding: 10px 14px; margin-bottom: 8px; }
   .alert-metric { color: var(--red); font-size: 11px; font-weight: 600; margin-bottom: 3px; }
   .alert-issue  { color: var(--text); font-size: 12px; margin-bottom: 3px; }
@@ -176,7 +171,6 @@
       <div class="section-title" id="detail-title">Vehicle Detail</div>
       <div class="detail-panel">
 
-        <!-- Charts -->
         <div class="panel">
           <div class="panel-header"><div class="panel-title">📈 Speed</div><span style="color:var(--muted);font-size:11px">Last 30 readings</span></div>
           <div class="chart-wrap"><canvas id="speed-chart"></canvas></div>
@@ -186,7 +180,6 @@
           <div class="chart-wrap"><canvas id="temp-chart"></canvas></div>
         </div>
 
-        <!-- Live Feed with units -->
         <div class="panel span2">
           <div class="panel-header">
             <div class="panel-title">📡 Live Feed</div>
@@ -197,7 +190,6 @@
           </div>
         </div>
 
-        <!-- Time Range Report -->
         <div class="panel span2">
           <div class="panel-header">
             <div class="panel-title">📊 Time Range Report</div>
@@ -215,7 +207,6 @@
           <div id="report-content"><div class="placeholder">Select a range above</div></div>
         </div>
 
-        <!-- AI Alerts -->
         <div class="panel span2">
           <div class="panel-header">
             <div class="panel-title">🤖 AI Anomaly Detection</div>
@@ -237,7 +228,6 @@ let currentRange = '1h';
 let pollInterval = null;
 let speedChart = null, tempChart = null;
 
-// ── Connection ───────────────────────────────────────────────────────────────
 
 function startPolling() {
   API = document.getElementById('api-input').value.replace(/\/$/, '');
@@ -268,7 +258,6 @@ function setLive(ok) {
   lbl.textContent        = ok ? 'LIVE' : 'ERROR';
 }
 
-// ── Fleet Cards ───────────────────────────────────────────────────────────────
 
 function renderFleet(vehicles) {
   const grid = document.getElementById('vehicle-grid');
@@ -293,7 +282,6 @@ function renderFleet(vehicles) {
   }).join('');
 }
 
-// ── Vehicle Selection ─────────────────────────────────────────────────────────
 
 function selectVehicle(vid) {
   selectedVehicle = vid;
@@ -307,7 +295,6 @@ function selectVehicle(vid) {
   loadReport(currentRange);
 }
 
-// ── Live Feed with Units ───────────────────────────────────────────────────────
 
 async function fetchDetail(vid) {
   try {
@@ -345,8 +332,6 @@ function renderFeed(rows) {
   document.getElementById('feed-content').innerHTML = header + body;
 }
 
-// ── Charts ────────────────────────────────────────────────────────────────────
-
 function renderCharts(rows) {
   const labels = rows.map((_, i) => i + 1);
   const cfg = (label, data, color, unit) => ({
@@ -366,8 +351,6 @@ function renderCharts(rows) {
   speedChart = new Chart(document.getElementById('speed-chart'), cfg('Speed', rows.map(r => r.speed), '#00d4ff', 'km/h'));
   tempChart  = new Chart(document.getElementById('temp-chart'),  cfg('Temp',  rows.map(r => r.temperature), '#ff8c00', '°C'));
 }
-
-// ── Time Range Report ─────────────────────────────────────────────────────────
 
 async function loadReport(range) {
   currentRange = range;
@@ -427,8 +410,6 @@ function rangeLabel(r) {
   return { '10m':'10 min','30m':'30 min','1h':'1 hour','6h':'6 hours','24h':'24 hours','7d':'7 days' }[r] || r;
 }
 
-// ── CSV Export ────────────────────────────────────────────────────────────────
-
 function downloadCSV() {
   if (!selectedVehicle) return;
   const url = `${API}/export/${selectedVehicle}/csv?range=${currentRange}`;
@@ -436,8 +417,6 @@ function downloadCSV() {
   a.href = url; a.download = '';
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
 }
-
-// ── AI Alerts ─────────────────────────────────────────────────────────────────
 
 async function fetchAlerts(vid) {
   if (!vid) return;
@@ -467,8 +446,6 @@ async function fetchAlerts(vid) {
     document.getElementById('alerts-content').innerHTML = '<div class="placeholder" style="color:var(--red)">Could not reach alerts endpoint.</div>';
   }
 }
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function fmt(val, decimals = 1) { return val != null ? Number(val).toFixed(decimals) : '—'; }
 function tryParse(str) { try { return JSON.parse(str || '{}'); } catch { return {}; } }
