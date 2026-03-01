@@ -23,7 +23,6 @@ app.add_middleware(
 
 DB_PATH = "telemetry.db"
 
-# ── Database Setup ────────────────────────────────────────────────────────────
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
@@ -52,7 +51,6 @@ def init_db():
 
 init_db()
 
-# ── Time Range Helper ─────────────────────────────────────────────────────────
 
 RANGE_MAP = {
     "10m": timedelta(minutes=10),
@@ -72,20 +70,18 @@ def get_since(range_str: str) -> str:
         )
     return (datetime.utcnow() - delta).isoformat()
 
-# ── Models ────────────────────────────────────────────────────────────────────
 
 class TelemetryInput(BaseModel):
     vehicle_id:  str
-    speed:       Optional[float] = None   # km/h
-    temperature: Optional[float] = None   # Celsius
-    battery_pct: Optional[float] = None   # 0-100 %
-    fuel_level:  Optional[float] = None   # litres
+    speed:       Optional[float] = None   
+    temperature: Optional[float] = None   
+    battery_pct: Optional[float] = None   
+    fuel_level:  Optional[float] = None   
     latitude:    Optional[float] = None
     longitude:   Optional[float] = None
     engine_rpm:  Optional[float] = None
     extra:       Optional[dict]  = None
 
-# ── OpenRouter AI Helper ──────────────────────────────────────────────────────
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 OPENROUTER_MODEL = "nvidia/nemotron-3-nano-30b-a3b:free"
@@ -126,7 +122,6 @@ async def call_openrouter(prompt: str) -> str:
 
     result = resp.json()
 
-    # Extract text from response
     choices = result.get("choices", [])
     if not choices:
         raise ValueError("OpenRouter returned empty choices.")
@@ -139,7 +134,6 @@ async def call_openrouter(prompt: str) -> str:
 
     return text.strip()
 
-# ── Routes ────────────────────────────────────────────────────────────────────
 
 @app.get("/")
 def root():
@@ -150,7 +144,6 @@ def root():
     }
 
 
-# ── Ingest ────────────────────────────────────────────────────────────────────
 
 @app.post("/telemetry", status_code=201)
 def ingest_telemetry(data: TelemetryInput):
@@ -173,7 +166,6 @@ def ingest_telemetry(data: TelemetryInput):
     return {"status": "ok", "vehicle_id": data.vehicle_id}
 
 
-# ── Recent Telemetry ──────────────────────────────────────────────────────────
 
 @app.get("/telemetry/{vehicle_id}")
 def get_recent_telemetry(vehicle_id: str, limit: int = 50):
@@ -189,7 +181,6 @@ def get_recent_telemetry(vehicle_id: str, limit: int = 50):
     return [dict(r) for r in rows]
 
 
-# ── Fleet Overview ────────────────────────────────────────────────────────────
 
 @app.get("/vehicles")
 def list_vehicles():
@@ -207,7 +198,6 @@ def list_vehicles():
     return [dict(r) for r in rows]
 
 
-# ── Stats ─────────────────────────────────────────────────────────────────────
 
 @app.get("/stats/{vehicle_id}")
 def vehicle_stats(vehicle_id: str):
@@ -232,7 +222,6 @@ def vehicle_stats(vehicle_id: str):
     return dict(row)
 
 
-# ── Time Range Report ─────────────────────────────────────────────────────────
 
 @app.get("/report/{vehicle_id}")
 def vehicle_report(
@@ -291,7 +280,6 @@ def vehicle_report(
     }
 
 
-# ── CSV Export ────────────────────────────────────────────────────────────────
 
 @app.get("/export/{vehicle_id}/csv")
 def export_csv(
@@ -336,13 +324,12 @@ def export_csv(
     )
 
 
-# ── AI Anomaly Alerts (OpenRouter) ────────────────────────────────────────────
+
 
 @app.get("/alerts/{vehicle_id}")
 async def get_ai_alerts(vehicle_id: str):
     """Use OpenRouter AI to detect anomalies in the last 20 readings."""
 
-    # Check key early
     api_key = os.getenv("OPENROUTER_API_KEY", "").strip()
     if not api_key:
         return {
@@ -389,18 +376,15 @@ Rules:
     try:
         text = await call_openrouter(prompt)
 
-        # Strip markdown code fences if AI adds them
         text = re.sub(r"^```(?:json)?\s*", "", text)
         text = re.sub(r"\s*```$", "", text).strip()
 
-        # Extract JSON object even if there's extra text around it
         match = re.search(r'\{.*\}', text, re.DOTALL)
         if match:
             text = match.group(0)
 
         parsed = json.loads(text)
 
-        # Validate required keys exist
         if "risk_level" not in parsed:
             parsed["risk_level"] = "UNKNOWN"
         if "alerts" not in parsed:
@@ -430,7 +414,6 @@ Rules:
         }
 
 
-# ── Clear Data ────────────────────────────────────────────────────────────────
 
 @app.delete("/telemetry/{vehicle_id}")
 def clear_vehicle_data(vehicle_id: str):
