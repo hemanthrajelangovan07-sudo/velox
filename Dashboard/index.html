@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>VeloxTelemetry — Fleet Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet"/>
+<style>
+  :root {
+    --bg:      #080c10;
+    --surface: #0d1420;
+    --border:  #1a2535;
+    --accent:  #00d4ff;
+    --green:   #00ff9d;
+    --orange:  #ff8c00;
+    --red:     #ff3b5c;
+    --muted:   #4a5a6e;
+    --text:    #c8d8e8;
+    --heading: #e8f4ff;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'JetBrains Mono', monospace; font-size: 13px;
+    min-height: 100vh; overflow-x: hidden;
+  }
+  body::before {
+    content: ''; position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px; pointer-events: none; z-index: 0;
+  }
+  #app { position: relative; z-index: 1; }
+
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 18px 32px; border-bottom: 1px solid var(--border);
+    background: rgba(8,12,16,0.9); backdrop-filter: blur(12px);
+    position: sticky; top: 0; z-index: 100;
+  }
+  .logo { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800; color: var(--heading); }
+  .logo span { color: var(--accent); }
+  .status-badge { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  main { padding: 24px 32px; max-width: 1440px; margin: 0 auto; }
+
+  .api-url-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 24px; }
+  .api-url-bar input {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+    padding: 8px 14px; color: var(--text); font-family: 'JetBrains Mono', monospace;
+    font-size: 12px; width: 280px; outline: none; transition: border-color .2s;
+  }
+  .api-url-bar input:focus { border-color: var(--accent); }
+  .btn {
+    padding: 8px 16px; background: transparent; border: 1px solid var(--accent);
+    border-radius: 6px; color: var(--accent); font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; cursor: pointer; transition: background .15s; white-space: nowrap;
+  }
+  .btn:hover { background: rgba(0,212,255,0.1); }
+  .btn.green { border-color: var(--green); color: var(--green); }
+  .btn.green:hover { background: rgba(0,255,157,0.1); }
+  .btn.orange { border-color: var(--orange); color: var(--orange); }
+  .btn.orange:hover { background: rgba(255,140,0,0.1); }
+
+  .section-title {
+    font-family: 'Syne', sans-serif; font-size: 11px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: 2px; color: var(--muted); margin-bottom: 14px;
+  }
+
+  /* ── Vehicle Cards ── */
+  .vehicle-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; margin-bottom: 28px; }
+  .vehicle-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px; cursor: pointer; transition: border-color .2s, transform .15s;
+    position: relative; overflow: hidden;
+  }
+  .vehicle-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0; transition: opacity .2s;
+  }
+  .vehicle-card:hover, .vehicle-card.active { border-color: var(--accent); transform: translateY(-2px); }
+  .vehicle-card:hover::before, .vehicle-card.active::before { opacity: 1; }
+  .vehicle-id { font-family: 'Syne', sans-serif; font-size: 14px; font-weight: 700; color: var(--heading); margin-bottom: 3px; }
+  .vehicle-name { color: var(--muted); font-size: 11px; margin-bottom: 12px; }
+  .metric-row { display: flex; justify-content: space-between; margin-bottom: 5px; align-items: center; }
+  .metric-label { color: var(--muted); font-size: 11px; }
+  .metric-value { font-size: 12px; font-weight: 500; color: var(--heading); }
+  .metric-value.warn   { color: var(--orange); }
+  .metric-value.danger { color: var(--red); }
+  .metric-value.ok     { color: var(--green); }
+  .risk-badge { display: inline-block; margin-top: 10px; padding: 2px 8px; border-radius: 3px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
+  .risk-LOW    { background: rgba(0,255,157,0.1);  color: var(--green); }
+  .risk-MEDIUM { background: rgba(255,140,0,0.15); color: var(--orange); }
+  .risk-HIGH   { background: rgba(255,59,92,0.15); color: var(--red); }
+  .risk-UNKNOWN{ background: rgba(74,90,110,0.2);  color: var(--muted); }
+
+  /* ── Detail Panel ── */
+  .detail-panel { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 28px; }
+  @media(max-width:800px){ .detail-panel { grid-template-columns: 1fr; } }
+  .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+  .panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .panel-title { font-family: 'Syne', sans-serif; font-size: 12px; font-weight: 700; color: var(--heading); text-transform: uppercase; letter-spacing: 1.5px; }
+  .chart-wrap { position: relative; height: 100px; }
+
+  /* ── Live Feed ── */
+  .feed { max-height: 300px; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+  .feed-row {
+    display: grid;
+    grid-template-columns: 86px 90px 90px 72px 72px 90px;
+    gap: 6px; padding: 6px 0;
+    border-bottom: 1px solid rgba(26,37,53,0.6);
+    font-size: 11px; align-items: center;
+    animation: fadeSlide .3s ease;
+  }
+  @keyframes fadeSlide { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:none} }
+  .feed-header { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid var(--border) !important; padding-bottom: 6px !important; }
+  .feed-time { color: var(--muted); }
+  .unit { color: var(--muted); font-size: 9px; margin-left: 1px; }
+
+  /* ── Report Panel ── */
+  .report-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .range-btn {
+    padding: 5px 12px; background: transparent; border: 1px solid var(--border);
+    border-radius: 4px; color: var(--muted); font-family: 'JetBrains Mono', monospace;
+    font-size: 11px; cursor: pointer; transition: all .15s;
+  }
+  .range-btn:hover, .range-btn.active { border-color: var(--accent); color: var(--accent); background: rgba(0,212,255,0.08); }
+
+  .stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  @media(max-width:600px){ .stat-grid { grid-template-columns: 1fr 1fr; } }
+  .stat-box { background: rgba(0,212,255,0.04); border: 1px solid var(--border); border-radius: 6px; padding: 10px 14px; }
+  .stat-key { color: var(--muted); font-size: 10px; text-transform: uppercase; margin-bottom: 4px; }
+  .stat-val { color: var(--heading); font-size: 15px; font-family: 'Syne', sans-serif; font-weight: 700; }
+  .stat-sub { color: var(--muted); font-size: 10px; margin-top: 2px; }
+
+  /* ── Alerts ── */
+  .alert-item { background: rgba(255,59,92,0.06); border: 1px solid rgba(255,59,92,0.2); border-radius: 6px; padding: 10px 14px; margin-bottom: 8px; }
+  .alert-metric { color: var(--red); font-size: 11px; font-weight: 600; margin-bottom: 3px; }
+  .alert-issue  { color: var(--text); font-size: 12px; margin-bottom: 3px; }
+  .alert-rec    { color: var(--muted); font-size: 11px; }
+  .no-alerts    { color: var(--green); font-size: 12px; text-align: center; padding: 20px; }
+  .alert-summary { color: var(--text); font-size: 12px; margin: 8px 0 12px; line-height: 1.5; }
+
+  .placeholder { color: var(--muted); text-align: center; padding: 32px; font-size: 12px; }
+  .loading { color: var(--accent); animation: pulse 1s infinite; }
+  .span2 { grid-column: span 2; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="logo">Velox<span>Telemetry</span></div>
+    <div class="status-badge">
+      <div class="dot" id="live-dot"></div>
+      <span id="live-label">CONNECTING</span>
+    </div>
+  </header>
+
+  <main>
+    <div class="api-url-bar">
+      <input id="api-input" value="http://localhost:8000" placeholder="http://localhost:8000"/>
+      <button class="btn" onclick="startPolling()">▶ CONNECT</button>
+    </div>
+
+    <div class="section-title">Active Fleet</div>
+    <div class="vehicle-grid" id="vehicle-grid">
+      <div class="placeholder loading">Waiting for data…</div>
+    </div>
+
+    <div id="detail-section" style="display:none">
+      <div class="section-title" id="detail-title">Vehicle Detail</div>
+      <div class="detail-panel">
+
+        <!-- Charts -->
+        <div class="panel">
+          <div class="panel-header"><div class="panel-title">📈 Speed</div><span style="color:var(--muted);font-size:11px">Last 30 readings</span></div>
+          <div class="chart-wrap"><canvas id="speed-chart"></canvas></div>
+        </div>
+        <div class="panel">
+          <div class="panel-header"><div class="panel-title">🌡 Temperature</div><span style="color:var(--muted);font-size:11px">Last 30 readings</span></div>
+          <div class="chart-wrap"><canvas id="temp-chart"></canvas></div>
+        </div>
+
+        <!-- Live Feed with units -->
+        <div class="panel span2">
+          <div class="panel-header">
+            <div class="panel-title">📡 Live Feed</div>
+            <span style="color:var(--muted);font-size:10px">Auto-refreshes every 3s</span>
+          </div>
+          <div class="feed" id="feed-content">
+            <div class="placeholder">Select a vehicle to see live data</div>
+          </div>
+        </div>
+
+        <!-- Time Range Report -->
+        <div class="panel span2">
+          <div class="panel-header">
+            <div class="panel-title">📊 Time Range Report</div>
+            <button class="btn green" id="csv-btn" onclick="downloadCSV()" style="display:none">⬇ Export CSV</button>
+          </div>
+          <div class="report-controls">
+            <span style="color:var(--muted);font-size:11px">Range:</span>
+            <button class="range-btn" onclick="loadReport('10m')">10 min</button>
+            <button class="range-btn" onclick="loadReport('30m')">30 min</button>
+            <button class="range-btn active" onclick="loadReport('1h')">1 hour</button>
+            <button class="range-btn" onclick="loadReport('6h')">6 hours</button>
+            <button class="range-btn" onclick="loadReport('24h')">24 hours</button>
+            <button class="range-btn" onclick="loadReport('7d')">7 days</button>
+          </div>
+          <div id="report-content"><div class="placeholder">Select a range above</div></div>
+        </div>
+
+        <!-- AI Alerts -->
+        <div class="panel span2">
+          <div class="panel-header">
+            <div class="panel-title">🤖 AI Anomaly Detection</div>
+            <button class="btn orange" onclick="fetchAlerts(selectedVehicle)">↻ Re-analyze</button>
+          </div>
+          <div id="alerts-content"><div class="placeholder loading">Analyzing…</div></div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+let API = 'http://localhost:8000';
+let selectedVehicle = null;
+let currentRange = '1h';
+let pollInterval = null;
+let speedChart = null, tempChart = null;
+
+// ── Connection ───────────────────────────────────────────────────────────────
+
+function startPolling() {
+  API = document.getElementById('api-input').value.replace(/\/$/, '');
+  if (pollInterval) clearInterval(pollInterval);
+  fetchFleet();
+  pollInterval = setInterval(() => {
+    fetchFleet();
+    if (selectedVehicle) fetchDetail(selectedVehicle);
+  }, 3000);
+}
+
+async function fetchFleet() {
+  try {
+    const res = await fetch(`${API}/vehicles`);
+    if (!res.ok) throw new Error();
+    renderFleet(await res.json());
+    setLive(true);
+  } catch {
+    setLive(false);
+  }
+}
+
+function setLive(ok) {
+  const dot = document.getElementById('live-dot');
+  const lbl = document.getElementById('live-label');
+  dot.style.background   = ok ? 'var(--green)' : 'var(--red)';
+  dot.style.boxShadow    = ok ? '0 0 8px var(--green)' : '0 0 8px var(--red)';
+  lbl.textContent        = ok ? 'LIVE' : 'ERROR';
+}
+
+// ── Fleet Cards ───────────────────────────────────────────────────────────────
+
+function renderFleet(vehicles) {
+  const grid = document.getElementById('vehicle-grid');
+  if (!vehicles.length) { grid.innerHTML = '<div class="placeholder">No vehicles yet. Run simulator.py!</div>'; return; }
+
+  grid.innerHTML = vehicles.map(v => {
+    const extra = tryParse(v.extra);
+    const name  = extra.vehicle_name || extra.vehicle_type || 'Vehicle';
+    const sc = v.speed > 130 ? 'danger' : v.speed > 100 ? 'warn' : 'ok';
+    const tc = v.temperature > 100 ? 'danger' : v.temperature > 90 ? 'warn' : '';
+    const bc = v.battery_pct < 15 ? 'danger' : v.battery_pct < 30 ? 'warn' : '';
+    const active = selectedVehicle === v.vehicle_id ? 'active' : '';
+    return `<div class="vehicle-card ${active}" onclick="selectVehicle('${v.vehicle_id}')">
+      <div class="vehicle-id">${v.vehicle_id}</div>
+      <div class="vehicle-name">${name}</div>
+      <div class="metric-row"><span class="metric-label">Speed</span><span class="metric-value ${sc}">${fmt(v.speed)} km/h</span></div>
+      <div class="metric-row"><span class="metric-label">Temp</span><span class="metric-value ${tc}">${fmt(v.temperature)}°C</span></div>
+      <div class="metric-row"><span class="metric-label">Battery</span><span class="metric-value ${bc}">${v.battery_pct != null ? fmt(v.battery_pct) + '%' : '—'}</span></div>
+      <div class="metric-row"><span class="metric-label">Fuel</span><span class="metric-value">${v.fuel_level != null ? fmt(v.fuel_level) + ' L' : '—'}</span></div>
+      <div class="metric-row"><span class="metric-label">RPM</span><span class="metric-value">${fmt(v.engine_rpm, 0)}</span></div>
+    </div>`;
+  }).join('');
+}
+
+// ── Vehicle Selection ─────────────────────────────────────────────────────────
+
+function selectVehicle(vid) {
+  selectedVehicle = vid;
+  document.getElementById('detail-section').style.display = 'block';
+  document.getElementById('detail-title').textContent = `Detail — ${vid}`;
+  document.getElementById('csv-btn').style.display = 'inline-block';
+  document.getElementById('alerts-content').innerHTML = '<div class="placeholder loading">Analyzing…</div>';
+
+  fetchDetail(vid);
+  fetchAlerts(vid);
+  loadReport(currentRange);
+}
+
+// ── Live Feed with Units ───────────────────────────────────────────────────────
+
+async function fetchDetail(vid) {
+  try {
+    const res = await fetch(`${API}/telemetry/${vid}?limit=50`);
+    const data = await res.json();
+    renderFeed(data.slice(0, 20));
+    renderCharts(data.slice(0, 30).reverse());
+  } catch {}
+}
+
+function renderFeed(rows) {
+  if (!rows.length) return;
+  const header = `<div class="feed-row feed-header">
+    <span>Time</span>
+    <span>Speed</span>
+    <span>Temp</span>
+    <span>Battery</span>
+    <span>Fuel</span>
+    <span>RPM</span>
+  </div>`;
+  const body = rows.map(r => {
+    const t  = r.timestamp ? r.timestamp.split('T')[1].slice(0,8) : '—';
+    const sc = r.speed > 130 ? 'danger' : r.speed > 100 ? 'warn' : '';
+    const tc = r.temperature > 100 ? 'danger' : r.temperature > 90 ? 'warn' : '';
+    const bc = r.battery_pct < 15 ? 'danger' : r.battery_pct < 30 ? 'warn' : '';
+    return `<div class="feed-row">
+      <span class="feed-time">${t}</span>
+      <span class="metric-value ${sc}">${fmt(r.speed)}<span class="unit">km/h</span></span>
+      <span class="metric-value ${tc}">${fmt(r.temperature)}<span class="unit">°C</span></span>
+      <span class="metric-value ${bc}">${r.battery_pct != null ? fmt(r.battery_pct) + '<span class="unit">%</span>' : '—'}</span>
+      <span>${r.fuel_level != null ? fmt(r.fuel_level) + '<span class="unit">L</span>' : '—'}</span>
+      <span>${fmt(r.engine_rpm, 0)}<span class="unit">rpm</span></span>
+    </div>`;
+  }).join('');
+  document.getElementById('feed-content').innerHTML = header + body;
+}
+
+// ── Charts ────────────────────────────────────────────────────────────────────
+
+function renderCharts(rows) {
+  const labels = rows.map((_, i) => i + 1);
+  const cfg = (label, data, color, unit) => ({
+    type: 'line',
+    data: { labels, datasets: [{ label, data, borderColor: color, backgroundColor: color + '18', borderWidth: 2, pointRadius: 0, fill: true, tension: 0.4 }] },
+    options: {
+      animation: false, responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => `${ctx.parsed.y} ${unit}` } } },
+      scales: {
+        x: { display: false },
+        y: { grid: { color: '#1a2535' }, ticks: { color: '#4a5a6e', font: { size: 10 } } }
+      }
+    }
+  });
+  if (speedChart) speedChart.destroy();
+  if (tempChart)  tempChart.destroy();
+  speedChart = new Chart(document.getElementById('speed-chart'), cfg('Speed', rows.map(r => r.speed), '#00d4ff', 'km/h'));
+  tempChart  = new Chart(document.getElementById('temp-chart'),  cfg('Temp',  rows.map(r => r.temperature), '#ff8c00', '°C'));
+}
+
+// ── Time Range Report ─────────────────────────────────────────────────────────
+
+async function loadReport(range) {
+  currentRange = range;
+  document.querySelectorAll('.range-btn').forEach(b => b.classList.toggle('active', b.textContent.includes(rangeLabel(range))));
+  if (!selectedVehicle) return;
+
+  document.getElementById('report-content').innerHTML = '<div class="placeholder loading">Loading report…</div>';
+  try {
+    const res = await fetch(`${API}/report/${selectedVehicle}?range=${range}`);
+    if (!res.ok) throw new Error('No data in this range');
+    const d = await res.json();
+    const s = d.summary;
+    document.getElementById('report-content').innerHTML = `
+      <div style="color:var(--muted);font-size:11px;margin-bottom:12px">
+        ${d.period_start ? d.period_start.split('T')[0] + ' ' + d.period_start.split('T')[1].slice(0,8) : '—'} →
+        ${d.period_end   ? d.period_end.split('T')[1].slice(0,8) : '—'} UTC
+        &nbsp;·&nbsp; ${s.total_readings} readings
+      </div>
+      <div class="stat-grid">
+        <div class="stat-box">
+          <div class="stat-key">Speed</div>
+          <div class="stat-val">${s.speed_kmh.avg} <span style="font-size:11px;color:var(--muted)">km/h avg</span></div>
+          <div class="stat-sub">Max ${s.speed_kmh.max} · Min ${s.speed_kmh.min} km/h</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-key">Temperature</div>
+          <div class="stat-val">${s.temperature_c.avg} <span style="font-size:11px;color:var(--muted)">°C avg</span></div>
+          <div class="stat-sub">Max ${s.temperature_c.max} · Min ${s.temperature_c.min} °C</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-key">Battery</div>
+          <div class="stat-val">${s.battery_pct.avg} <span style="font-size:11px;color:var(--muted)">% avg</span></div>
+          <div class="stat-sub">Min ${s.battery_pct.min}%</div>
+        </div>
+        ${s.fuel_litres ? `<div class="stat-box">
+          <div class="stat-key">Fuel</div>
+          <div class="stat-val">${s.fuel_litres.avg} <span style="font-size:11px;color:var(--muted)">L avg</span></div>
+          <div class="stat-sub">Min ${s.fuel_litres.min} L</div>
+        </div>` : ''}
+        <div class="stat-box">
+          <div class="stat-key">Engine RPM</div>
+          <div class="stat-val">${s.engine_rpm.avg} <span style="font-size:11px;color:var(--muted)">avg</span></div>
+          <div class="stat-sub">Max ${s.engine_rpm.max} rpm</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-key">Total Readings</div>
+          <div class="stat-val">${s.total_readings}</div>
+          <div class="stat-sub">in last ${range}</div>
+        </div>
+      </div>`;
+  } catch(e) {
+    document.getElementById('report-content').innerHTML = `<div class="placeholder" style="color:var(--red)">No data available for this time range.</div>`;
+  }
+}
+
+function rangeLabel(r) {
+  return { '10m':'10 min','30m':'30 min','1h':'1 hour','6h':'6 hours','24h':'24 hours','7d':'7 days' }[r] || r;
+}
+
+// ── CSV Export ────────────────────────────────────────────────────────────────
+
+function downloadCSV() {
+  if (!selectedVehicle) return;
+  const url = `${API}/export/${selectedVehicle}/csv?range=${currentRange}`;
+  const a = document.createElement('a');
+  a.href = url; a.download = '';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
+// ── AI Alerts ─────────────────────────────────────────────────────────────────
+
+async function fetchAlerts(vid) {
+  if (!vid) return;
+  document.getElementById('alerts-content').innerHTML = '<div class="placeholder loading">AI analyzing last 20 readings…</div>';
+  try {
+    const res = await fetch(`${API}/alerts/${vid}`);
+    const d   = await res.json();
+    const riskClass = `risk-${d.risk_level}`;
+    let html = `
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+        <span class="risk-badge ${riskClass}">${d.risk_level} RISK</span>
+      </div>
+      <div class="alert-summary">${d.summary}</div>`;
+
+    if (d.alerts && d.alerts.length) {
+      html += d.alerts.map(a => `
+        <div class="alert-item">
+          <div class="alert-metric">⚠ ${a.metric.toUpperCase()}</div>
+          <div class="alert-issue">${a.issue}</div>
+          <div class="alert-rec">→ ${a.recommendation}</div>
+        </div>`).join('');
+    } else if (d.risk_level === 'LOW') {
+      html += '<div class="no-alerts">✓ All metrics are within safe operating ranges</div>';
+    }
+    document.getElementById('alerts-content').innerHTML = html;
+  } catch(e) {
+    document.getElementById('alerts-content').innerHTML = '<div class="placeholder" style="color:var(--red)">Could not reach alerts endpoint.</div>';
+  }
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function fmt(val, decimals = 1) { return val != null ? Number(val).toFixed(decimals) : '—'; }
+function tryParse(str) { try { return JSON.parse(str || '{}'); } catch { return {}; } }
+
+window.onload = () => startPolling();
+</script>
+</body>
+</html>
