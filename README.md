@@ -47,11 +47,21 @@ vehicle-telemetry/
 ---
 
 ### Step 1 — Install backend dependencies
-
+**PowerShell (Windows):**
 ```powershell
 cd backend
 pip install -r requirements.txt
 ```
+**Bash/zsh (Linux/Mac):**
+```zsh
+cd backend 
+python -m venv .venv
+source .venv/bin/activate 
+pip install -r requirements.txt 
+```
+>  ⚠️ Incase of errors while installing the requirements.txt packages, try installing it seperately i.e. using "sudo pacman -S python-'packagename'" or your preferred package manager 
+
+>  ⚠️ Some Operating systems like Arch-linux, etc. might need to install httpx to run the program. 
 
 ---
 
@@ -91,6 +101,9 @@ cd simulator
 pip install -r requirements.txt
 python simulator.py
 ```
+>  ⚠️ Incase of errors while installing the requirements.txt packages, try installing it seperately i.e. using "sudo pacman -S python-'packagename'" or your preferred package manager 
+
+
 
 This simulates **5 vehicles** sending live telemetry every 2 seconds:
 - VH-001 Tesla Model 3 (EV)
